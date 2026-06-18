@@ -4,3 +4,5 @@ pyvenv.cfg
 Include/
 Scripts/
 Lib/
+__pycachce__/
+*.pyc
