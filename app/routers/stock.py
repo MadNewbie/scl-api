@@ -24,15 +24,35 @@ class RequestCheckStockModel(BaseModel):
     quantity_level: str
     customer_type: str
 
-def formatProductCode(product_code, db_res):
+def formatProductCode(product_code, db_res, uom):
     default_product_codes = list(map(lambda x: {"code": x.code, "qty-available":0}, product_code))
 
-    dict_db = {item['code']:item['qty-available'] for item in db_res}
+    dict_db_pack = {item['code']:item['qty-available-pack'] for item in db_res}
+    dict_db_slop = {item['code']:item['qty-available-slop'] for item in db_res}
+    dict_db_bal = {item['code']:item['qty-available-bal'] for item in db_res}
+    dict_db_box = {item['code']:item['qty-available-box'] for item in db_res}
 
-    result = list(map(lambda x:{
-        "code": x['code'],
-        "qty-available": dict_db.get(x['code'], x['qty-available'])
-    },default_product_codes))
+    match uom.lower():
+        case "pack":
+            result = list(map(lambda x:{
+                "code": x['code'],
+                "qty-available": dict_db_pack.get(x['code'], 0)
+                },default_product_codes))
+        case "slop":
+            result = list(map(lambda x:{
+                "code": x['code'],
+                "qty-available": dict_db_slop.get(x['code'], 0)
+                },default_product_codes))
+        case "bal":
+            result = list(map(lambda x:{
+                "code": x['code'],
+                "qty-available": dict_db_bal.get(x['code'], 0)
+                },default_product_codes))
+        case "box":
+            result = list(map(lambda x:{
+                "code": x['code'],
+                "qty-available": dict_db_box.get(x['code'], 0)
+                },default_product_codes))
 
     return result
 
@@ -60,11 +80,15 @@ async def check_stock(request: RequestCheckStockModel, db:Session = Depends(get_
     else :
         stmtStock = text("SELECT * FROM public.fc_api_csbs_check_stock(:items,:wh,:sloc)")
         raw_product_stock_from_db = db.execute(stmtStock,{"items": product_codes, "wh": warehouse_sloc[0].wh_code, "sloc": warehouse_sloc[0].sloc_name}).mappings().all()
+        print(raw_product_stock_from_db)
         db_product_codes = list(map(lambda x: {
                     "code":x.code, 
-                    "qty-available":x.qty_available
+                    "qty-available-pack": x.qty_available_pack,
+                    "qty-available-slop": x.qty_available_slop,
+                    "qty-available-bal": x.qty_available_bal,
+                    "qty-available-box": x.qty_available_box,
                 },raw_product_stock_from_db))
-        res_product_codes = formatProductCode(request.product, db_product_codes)
+        res_product_codes = formatProductCode(request.product, db_product_codes, request.uom_level)
 
         return {
             "product": res_product_codes,
