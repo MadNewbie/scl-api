@@ -1,11 +1,12 @@
 from pydantic import BaseModel, Field
 from datetime import datetime,date
-from fastapi import APIRouter,Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from psycopg2 import errors
 from ..errors import generalError404, error405, error406, error414, error416
 from ..database import autocommit_db, get_db
 from ..dependencies import check_token_header
@@ -157,11 +158,21 @@ async def create_booking(request: RequestBooking, db: Session = Depends(get_db),
                     "header_quantity": 1000,
                     "details": json.dumps(booked_product_id)
                 }).mappings().all()
-                print(raw_booking)
-            except SQLAlchemyError as e:
-                print(e)
-            except IntegrityError as e:
-                print(e)
+                # print(raw_booking)
+            except (SQLAlchemyError, IntegrityError, errors.UniqueViolation) as e:
+
+                print("SQLAlchemyError: ",e.instance, isinstance(e,errors.UniqueViolation))
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail = {
+                        "code": 400,
+                        "status": "Bad Request",
+                        "external_code": -100002,
+                        "external_desc": "Server Error",
+                        "errors": "Duplicate reference-code"
+                    }
+                )
+            
             return {
                 "stock-booking-id": raw_booking[0].booking_code,
                 "product": res_product_codes,
