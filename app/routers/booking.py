@@ -158,10 +158,7 @@ async def create_booking(request: RequestBooking, db: Session = Depends(get_db),
                     "header_quantity": 1000,
                     "details": json.dumps(booked_product_id)
                 }).mappings().all()
-                # print(raw_booking)
             except (SQLAlchemyError, IntegrityError, errors.UniqueViolation) as e:
-
-                print("SQLAlchemyError: ",e.instance, isinstance(e,errors.UniqueViolation))
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail = {
