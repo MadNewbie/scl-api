@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime,date
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
@@ -85,7 +85,11 @@ router = APIRouter(
 )
 
 @router.post("/booking", dependencies=[Depends(check_token_header)])
-async def create_booking(request: RequestBooking, db: Session = Depends(get_db), db_autocommit: Session = Depends(autocommit_db), status_code= status.HTTP_200_OK):
+async def create_booking(app: Request, request: RequestBooking, db: Session = Depends(get_db), db_autocommit: Session = Depends(autocommit_db), status_code= status.HTTP_200_OK):
+    all_uom = app.app.state.settings.ALL_UOM
+    other_sloc = app.app.state.settings.ACCESS_OTHER_SLOC
+    def_sloc = app.app.state.settings.SLOC_DEFAULT
+    def_uom = app.app.state.settings.UOM_DEFAULT
     if request.plant_code == "":
         return error405()
     
@@ -96,8 +100,11 @@ async def create_booking(request: RequestBooking, db: Session = Depends(get_db),
     stmt = text("SELECT * FROM public.fc_api_csbs_get_warehouse_sloc()")
     all_warehouse_sloc = db.execute(stmt).mappings().all()
     product_codes = list(map(lambda x: x.code,request.product))
-    warehouse_sloc = list(filter(lambda data: (data.wh_code == request.plant_code) and (data.sloc_name == request.stock_location), all_warehouse_sloc))
     product_with_book_qty = list(map(lambda x: {"code":x.code,"qty":x.qty_booked},request.product))
+    if other_sloc:
+        warehouse_sloc = list(filter(lambda data: (data.wh_code == request.plant_code) and (data.sloc_name == request.stock_location), all_warehouse_sloc))
+    else:
+        warehouse_sloc = list(filter(lambda data: (data.wh_code == request.plant_code) and (data.sloc_name == def_sloc), all_warehouse_sloc))
 
     if warehouse_sloc is None or warehouse_sloc == [] :
         return error406()
@@ -112,7 +119,13 @@ async def create_booking(request: RequestBooking, db: Session = Depends(get_db),
                     "qty-available-bal":x.qty_available_bal,
                     "qty-available-box":x.qty_available_box,
                 },raw_product_stock_from_db))
-        available_product_on_wh = formatProductCode(request.product, db_product_codes,request.uom_level)
+        
+        if all_uom:
+            available_product_on_wh = formatProductCode(request.product, db_product_codes,request.uom_level)
+            uom_level = request.uom_level
+        else :
+            available_product_on_wh = formatProductCode(request.product, db_product_codes, def_uom)
+            uom_level = def_uom
 
         dict_available_product_on_wh = {item['code']: item['qty-available'] for item in available_product_on_wh}
         dict_available_product_on_wh_product_id = {item['code']: item['product-id'] for item in db_product_codes}
@@ -122,8 +135,10 @@ async def create_booking(request: RequestBooking, db: Session = Depends(get_db),
         unfulfilled_product_code = []
         booked_product_id = []
         res_product_codes = []
+        header_qty = 0
 
         for item in product_with_book_qty:
+            header_qty += item["qty"]
             if dict_available_product_on_wh.get(item["code"]) < item["qty"] :
                 unfulfilled_product_code.append(item["code"])
                 res_product_codes.append({
@@ -154,8 +169,8 @@ async def create_booking(request: RequestBooking, db: Session = Depends(get_db),
                     "customer_code": request.customer.code,
                     "reference_code": request.reference_code,
                     "booking_code": booking_code,
-                    "uom_level": request.uom_level,
-                    "header_quantity": 1000,
+                    "uom_level": uom_level,
+                    "header_quantity": header_qty,
                     "details": json.dumps(booked_product_id)
                 }).mappings().all()
             except (SQLAlchemyError, IntegrityError, errors.UniqueViolation) as e:

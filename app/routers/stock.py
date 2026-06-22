@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from fastapi import APIRouter,Depends, status
+from fastapi import APIRouter,Depends, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 from ..dependencies import check_token_header
@@ -62,7 +62,12 @@ router = APIRouter(
 )
 
 @router.post("/check-stock", dependencies=[Depends(check_token_header)])
-async def check_stock(request: RequestCheckStockModel, db:Session = Depends(get_db), status_code=status.HTTP_200_OK):
+async def check_stock(app: Request, request: RequestCheckStockModel, db:Session = Depends(get_db), status_code=status.HTTP_200_OK):
+    all_uom = app.app.state.settings.ALL_UOM
+    other_sloc = app.app.state.settings.ACCESS_OTHER_SLOC
+    def_sloc = app.app.state.settings.SLOC_DEFAULT
+    def_uom = app.app.state.settings.UOM_DEFAULT
+
     if request.plant_code == "":
         return error405()
     
@@ -73,7 +78,11 @@ async def check_stock(request: RequestCheckStockModel, db:Session = Depends(get_
     stmt = text("SELECT * FROM public.fc_api_csbs_get_warehouse_sloc()")
     all_warehouse_sloc = db.execute(stmt).mappings().all()
     product_codes = list(map(lambda x: x.code,request.product))
-    warehouse_sloc = list(filter(lambda data: (data.wh_code == request.plant_code) and (data.sloc_name == request.stock_location), all_warehouse_sloc))
+
+    if other_sloc:
+        warehouse_sloc = list(filter(lambda data: (data.wh_code == request.plant_code) and (data.sloc_name == request.stock_location), all_warehouse_sloc))
+    else:
+        warehouse_sloc = list(filter(lambda data: (data.wh_code == request.plant_code) and (data.sloc_name == def_sloc), all_warehouse_sloc))
 
     if warehouse_sloc is None or warehouse_sloc == [] :
         return error406()
@@ -88,7 +97,10 @@ async def check_stock(request: RequestCheckStockModel, db:Session = Depends(get_
                     "qty-available-bal": x.qty_available_bal,
                     "qty-available-box": x.qty_available_box,
                 },raw_product_stock_from_db))
-        res_product_codes = formatProductCode(request.product, db_product_codes, request.uom_level)
+        if all_uom:
+            res_product_codes = formatProductCode(request.product, db_product_codes, request.uom_level)
+        else :
+            res_product_codes = formatProductCode(request.product, db_product_codes, def_uom)
 
         return {
             "product": res_product_codes,

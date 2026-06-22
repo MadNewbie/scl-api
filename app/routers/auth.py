@@ -35,7 +35,7 @@ async def generate_token(request: RequestGenerateModel, db:Session = Depends(get
             "exp": exp,
             "iat": now
         }
-        print(payload)
+        # print(payload)
         token = jwt.encode(payload,secret,algorithm="HS256")
         token_type = "Bearer"
         # cek apakah user sudah punya token sebelumnya
