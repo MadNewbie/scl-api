@@ -11,7 +11,7 @@ def check_token_header(authorization: Annotated[str, Header()], db: Session = De
     stmtUser = text("SELECT * FROM public.fc_api_csbs_get_user_secret_by_token(:token)")
     user = db.execute(stmtUser,{"token": token}).mappings().all()
     if user is None or user == []:
-        print("Token Not Found", e)
+        print("Token Not Found")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail = {
