@@ -80,7 +80,7 @@ async def check_stock(request: RequestCheckStockModel, db:Session = Depends(get_
     else :
         stmtStock = text("SELECT * FROM public.fc_api_csbs_check_stock(:items,:wh,:sloc)")
         raw_product_stock_from_db = db.execute(stmtStock,{"items": product_codes, "wh": warehouse_sloc[0].wh_code, "sloc": warehouse_sloc[0].sloc_name}).mappings().all()
-        print(raw_product_stock_from_db)
+        # print(raw_product_stock_from_db)
         db_product_codes = list(map(lambda x: {
                     "code":x.code, 
                     "qty-available-pack": x.qty_available_pack,
