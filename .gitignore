@@ -6,5 +6,4 @@ Include/
 Scripts/
 Lib/
 __pycachce__/
-logs/*
-*.log.*
+*.log*
