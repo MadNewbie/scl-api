@@ -11,7 +11,7 @@ class AppSetting(BaseSettings):
     ALL_UOM: bool = os.getenv("ALL_UOM")
     ACCESS_OTHER_SLOC: bool = os.getenv("ACCESS_OTHER_SLOC")
 
-app = FastAPI(tilte="SCL-API")
+app = FastAPI(title="scl-api")
 
 app.state.settings = AppSetting()
 

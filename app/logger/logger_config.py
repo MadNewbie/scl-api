@@ -73,7 +73,7 @@ LOGGING_CONFIG = {
 
 #setup logger
 dictConfig(LOGGING_CONFIG)
-logger = logging.getLogger("SCL-API")
+logger = logging.getLogger("scl-api")
 logger.setLevel(logging.INFO)
 
 #add cloudwatch handler
