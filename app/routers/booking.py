@@ -222,17 +222,29 @@ async def cancel_booking(request: RequestCancelBooking, db: Session = Depends(ge
     stock_booking = raw_stock_booking[0]
     print(stock_booking)
     # cek status booking tidak aktif
-    if stock_booking.status != 1 or not(stock_booking.is_active):
+    if stock_booking.status != 10 or not(stock_booking.is_active):
         return error416()
     
     ref_code = request.reference_code
-    stmt_cancel = text("SELECT * FROM public.fc_api_csbs_cancel_booking(:booking_code, :reference_code)")
-    raw_cancel_booking = db_autocommit.execute(stmt_cancel, {
-        "booking_code": stock_booking.booking_code,
-        "reference_code": ref_code
-    }).mappings().all()
-    cancel_booking = raw_cancel_booking[0]
-    print(cancel_booking)
+    try:
+        stmt_cancel = text("SELECT * FROM public.fc_api_csbs_cancel_booking(:booking_code, :reference_code)")
+        raw_cancel_booking = db_autocommit.execute(stmt_cancel, {
+            "booking_code": stock_booking.booking_code,
+            "reference_code": ref_code
+        }).mappings().all()
+        cancel_booking = raw_cancel_booking[0]
+    except (SQLAlchemyError, IntegrityError, errors.UniqueViolation) as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail = {
+                        "code": 400,
+                        "status": "Bad Request",
+                        "external_code": -100002,
+                        "external_desc": "Server Error",
+                        "errors": "Duplicate reference-code"
+                    }
+                )
+    # print(cancel_booking)
 
     return {
         "reference-code": cancel_booking.reference_code,

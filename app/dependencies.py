@@ -1,17 +1,19 @@
 import jwt
 from typing import Annotated
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status, Request
 from sqlalchemy.sql import text
 from sqlalchemy.orm import Session
 from .database import get_db
+from .logger.logger_config import logger
 
 
-def check_token_header(authorization: Annotated[str, Header()], db: Session = Depends(get_db)):
+def check_token_header(request: Request, authorization: Annotated[str, Header()], db: Session = Depends(get_db)):
     token = authorization[7:]
     stmtUser = text("SELECT * FROM public.fc_api_csbs_get_user_secret_by_token(:token)")
     user = db.execute(stmtUser,{"token": token}).mappings().all()
     if user is None or user == []:
         print("Token Not Found")
+        logger.info(f"Token {token} not found")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail = {
@@ -43,8 +45,11 @@ def check_token_header(authorization: Annotated[str, Header()], db: Session = De
                 }
             )
         # logging
+        logger.info(f"User {user} dari aplikasi {secret} mencoba akses url {request.url}")
+        print(request.url)
     except jwt.ExpiredSignatureError as e:
-        print("Expired", e)
+        logger.info(f"Expired: {str(e)}")
+        print("Expired:", e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail = {
